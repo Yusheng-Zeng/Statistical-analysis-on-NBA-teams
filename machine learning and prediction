@@ -1,0 +1,171 @@
+#utf-8
+# 载入第三方包
+library(tidyverse)
+library(caret)
+library(rsample)
+library(ROCR)
+library(pheatmap)
+library(psych)
+library(kknn)
+library(randomForest)
+library(e1071)
+library(rvest)
+set.seed(20191208)
+
+# 载入数据
+csvAd <- "NBAdata.csv"
+nbadata <- read.csv(csvAd)
+
+# 建立训练集和测试集，分成70%的训练样本和30%的检验样本
+inTrain <- createDataPartition(y = nbadata$playoffs, p = 0.70, list = FALSE)
+nbadata_train <- nbadata[inTrain,]
+nbadata_test <- nbadata[-inTrain,]
+
+# 相关性计算
+pr<-corr.test((nbadata_train[,c(3:20,22)]),(nbadata_train[,c(3:20,22)]))
+pheatmap(pr$r,display_numbers = matrix(ifelse(pr$p <= 0.01, "**",
+  ifelse(pr$p<= 0.05 ,"*"," ")), nrow(pr$p)),fontsize=18)
+
+# 因子化
+nbadata_train$playoffs <- factor(nbadata_train$playoffs, labels = c("0","1"))
+nbadata_test$playoffs <- factor(nbadata_test$playoffs, labels = c("0","1"))
+
+# 整理可用于回归的数据集
+nbadata_train <- nbadata_train[,-1:-2]
+
+# No.1 建立Logistic回归模型
+lrPre <- train(playoffs ~ ., 
+ data = nbadata_train, method = "glm", family = "binomial", 
+ trControl = trainControl(method = "repeatedcv", number = 10, repeats = 10))
+
+
+# 输出Logistic回归预测结果
+nbadata_test$pre_lr <- predict(lrPre, newdata = nbadata_test, type = "raw")
+summary(lrPre)
+
+# Logistic回归预测混淆矩阵
+confusionMatrix(data = nbadata_test$pre_lr, reference = nbadata_test$playoffs)
+
+# Logistic回归ROC曲线
+rocrpred <- prediction(as.numeric(nbadata_test$pre_lr), as.numeric(nbadata_test$playoffs))
+perf <- performance(rocrpred, "tpr", "fpr")
+plot(perf, main = "ROC Curve - Logistic Regression")
+(auc_roc <- performance(rocrpred, measure = "auc")@y.values)
+
+# No.2 建立KNN算法模型
+knn <- kknn(playoffs ~ .,
+            nbadata_train,nbadata_test,k=7,distance = 2)
+
+# 输出KNN算法预测结果
+pre_knn <- fitted(knn)
+nbadata_test$pre_knn <- pre_knn
+
+# 混淆矩阵
+table(pre_knn, nbadata_test$playoffs)
+confusionMatrix(data = factor(pre_knn), reference = factor(nbadata_test$playoffs), positive = '1')
+
+#绘制ROC曲线并计算AUC值
+rocrpred <- prediction(as.numeric(nbadata_test$pre_knn), as.numeric(nbadata_test$playoffs))
+perf_knn <- performance(rocrpred, "tpr", "fpr")
+plot(perf_knn, main = "ROC Curve - KNN")
+(auc_roc <- performance(rocrpred, measure = "auc")@y.values)
+
+# No.3 建立随机森林模型
+rf_model <- train(playoffs ~ .,
+                  data = nbadata_train, method = 'rf', 
+                  trControl = trainControl(method = "repeatedcv", number = 10, repeats = 10),
+                  importance = TRUE, ntree = 300)
+print(rf_model)
+
+# 输出随机森林预测结果
+nbadata_test$pre_rf <- predict(rf_model, newdata = nbadata_test)
+
+# 随机森林混淆矩阵
+confusionMatrix(nbadata_test$pre_rf, nbadata_test$playoffs)
+
+# 随机森林ROC曲线
+rocrpred_rf <- prediction(as.numeric(nbadata_test$pre_rf), as.numeric(nbadata_test$playoffs))
+perf_rf <- performance(rocrpred_rf, "tpr", "fpr")
+plot(perf_rf, main = "ROC Curve - Random Forest")
+(auc_roc_rf <- performance(rocrpred_rf, measure = "auc")@y.values)
+
+
+# NO.4 建立朴素贝叶斯模型
+nb_model <- train(playoffs ~ .,
+                  trControl = trainControl(method = "repeatedcv", number = 10, repeats = 10),
+                  method = "nb",
+                  data = nbadata_train)
+print(nb_model)
+
+# 输出朴素贝叶斯预测结果
+nbadata_test$pre_nb <- predict(nb_model, newdata = nbadata_test)
+
+# 朴素贝叶斯混淆矩阵
+confusionMatrix(nbadata_test$pre_nb, nbadata_test$playoffs)
+
+# 朴素贝叶斯ROC曲线
+rocrpred_nb <- prediction(as.numeric(nbadata_test$pre_nb), as.numeric(nbadata_test$playoffs))
+perf_nb <- performance(rocrpred_nb, "tpr", "fpr")
+plot(perf_nb, main = "ROC Curve - Naive Bayes")
+(auc_roc_nb <- performance(rocrpred_nb, measure = "auc")@y.values)
+
+# No.5 建立支持向量机模型
+svm_model <- train(playoffs ~.,
+                   trControl = trainControl(method = "repeatedcv", number = 10, repeats = 10),
+                   method = "svmLinear",
+                   data = nbadata_train)
+print(svm_model)
+
+# 输出支持向量机预测结果
+nbadata_test$pre_svm <- predict(svm_model, newdata = nbadata_test)
+
+# 支持向量机混淆矩阵
+confusionMatrix(nbadata_test$pre_svm, nbadata_test$playoffs)
+
+# 支持向量机ROC曲线
+rocrpred_svm <- prediction(as.numeric(nbadata_test$pre_svm), as.numeric(nbadata_test$playoffs))
+perf_svm <- performance(rocrpred_svm, "tpr", "fpr")
+plot(perf_svm, main = "ROC Curve - SVM")
+(auc_roc_svm <- performance(rocrpred_svm, measure = "auc")@y.values)
+
+# No.6 效果评估
+par(mfrow = c(3,2))
+plot(perf, main = "ROC Curve - Logistic Regression")
+plot(perf_knn, main = "ROC Curve - KNN")
+plot(perf_rf, main = "ROC Curve - Random Forest")
+plot(perf_nb, main = "ROC Curve - Naive Bayes")
+plot(perf_svm, main = "ROC Curve - SVM")
+
+# 爬虫部分
+# 读取网页
+url <- "https://www.espn.com/nba/stats/team/_/season/2020/seasontype/2"
+webpage <- read_html(url)
+
+# 提取队伍信息
+teams_data_html <- webpage %>% html_nodes(".Table__TD")
+teams_data <- html_text(teams_data_html)
+
+# 整理
+# 整理队名
+teams <- teams_data[seq(2, 60, 2)]
+
+# 整理数据
+teamstats <- matrix(NA, nrow = 30, ncol = 18)
+for (i in 1:30) {
+  teamstats[i,] <- teams_data[seq((62 + 19*(i-1)), ((62+19*(i-1))+17),1)]
+}
+
+# 拼接数据
+nba2020 <- data.frame(cbind(teams, teamstats))
+colnames(nba2020)[2:19] <- colnames(nbadata)[3:20]
+nba2020$season <- rep('2020',30)
+nba2020 <- as.data.frame(lapply(nba2020,as.numeric))
+
+# 预测2020年季后赛
+nba2020$pred_lr <- predict(lrPre, newdata = nba2020, type = 'raw')
+knn <- kknn(playoffs ~ .,
+            nbadata_train,nba2020,k=7,distance = 2)
+nba2020$pred_knn <- predict(knn, newdata = nba2020)
+nba2020$pred_rf <- predict(rf_model, newdata= nba2020)
+nba2020$pred_nb <- predict(nb_model, newdata = nba2020)
+nba2020$pred_svm <- predict(svm_model, newdata = nba2020)

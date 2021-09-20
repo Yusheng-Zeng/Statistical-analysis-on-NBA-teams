@@ -1,0 +1,219 @@
+---
+title: "Untitled"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+df <- read.table("C:/Users/DELL/Desktop/85-20data-new.txt",header=TRUE,sep=",")
+
+#library(dplyr)
+#library(magrittr)
+#library(ggplot2)
+#library(ggthemes)
+#library(reshape2)
+
+#df$X2.A
+
+#df$X2.A<-data.frame(lapply(df$X2.A, function(x) as.numeric(gsub("\\%", "", x))/100))
+
+#问题1
+par(mfrow=c(1,5))
+#①球队场均得分与胜率
+revelant <- lm(df$PTS ~ df$WR,data = df)
+summary(revelant)
+cor(df$PTS,df$WR)#回归系数
+plot(df$PTS,df$WR)
+abline(revelant)
+
+#②球队投篮命中率与胜率
+revelant <- lm(df$ALL.A ~ df$WR,data = df)
+summary(revelant)
+cor(df$ALL.A,df$WR)
+plot(df$ALL.A,df$WR)
+abline(revelant)
+
+#③球队投篮命中率与场均得分
+revelant <- lm(df$ALL.A ~ df$PTS,data = df)
+summary(revelant)
+cor(df$ALL.A,df$PTS)
+plot(df$ALL.A,df$PTS)
+abline(revelant)
+
+#④球队出手次数与场均得分
+revelant <- lm(df$ALL.S ~ df$PTS,data = df)
+summary(revelant)
+cor(df$ALL.S,df$PTS)
+plot(df$ALL.S,df$PTS)
+abline(revelant)
+
+#⑤球队罚球命中率与胜率
+revelant <- lm(df$FT.A ~ df$WR,data = df)
+summary(revelant)
+cor(df$FT.A,df$WR)
+plot(df$FT.A,df$WR)
+abline(revelant)
+
+#问题2
+syear <- unique(df$Season)
+both_pts5_wr5 <- data.frame( Season=rep(NA,35),
+                           both_count=rep(NA,35))
+
+rela_pts5_wr5 <- function(S){
+  #根据赛季，取出数据
+  #S <- "85-86"
+  #print(S)0
+  #print(df$Season)
+  data_need_1 <- df[df$Season==S,]
+  #print(S)
+  #查看该赛季得分前5
+  pts5 <- data_need_1[order(-data_need_1$PTS),]
+  pts5 <- pts5[1:5,]
+  #查看该赛季胜率前5
+  wr5 <- data_need_1[order(-data_need_1$WR),]
+  wr5 <- wr5[1:5,]
+  #寻找得分胜率均在前5的球队
+  both_count=0
+  for(i in 1:5){
+    #print(i)
+    for(j in 1:5){
+      #print(j)
+      #print(pts5[i,'TEAM'])
+      #print(wr5[j,'TEAM'])
+      if(pts5[i,'TEAM']==wr5[j,'TEAM']){
+        both_count <- both_count + 1
+      }
+      #print(both_count)
+    }
+  }
+  return (both_count)
+}
+
+for (z in 1:length(syear)){
+  #print(z)
+  Season <- syear[z]
+  #print(Season)
+  both_pts5_wr5[z,'both_count'] <- rela_pts5_wr5(Season)
+  both_pts5_wr5[z, 'Season'] <- Season
+  #print(both_pts5_wr5[z,'both_count'])
+}
+
+#df[df$SeasonEnd==S,]
+#df$SeasonEnd
+#pts5
+both_pts5_wr5
+
+#问题3
+plot_pts_wr <- function(TEAM){
+  # TEAM <- "Los Angeles Lakers"
+  #根据球队，选取数据
+  data_need_2 <- df[df$TEAM==TEAM,]
+  #画出得分随时间变化散点图
+  plot(data_need_2$Season,data_need_2$PTS,pch=15,
+       col="DarkTurquoise",xlim = c(0,35),ylim=c(70,130),xaxt="n")
+  lines(data_need_2$PTS,col="DarkTurquoise",lty=1)#lty=1表示用实线连起来
+  axis(1,league_data$Season,at=1:35,las=3)    #设置X轴坐标刻度
+  #画出胜率随时间变化散点图
+  plot(data_need_2$Season,data_need_2$WR,pch=16,
+       col="DeepPink",xlim = c(0,35),ylim=c(0,1),xaxt="n")  #连线
+  lines(data_need_2$WR,col="DeepPink",lty=2) #lty=2表示用虚线连起来
+  axis(1,league_data$Season,at=1:35,las=3)    #设置X轴坐标刻度
+  }
+options(warn = -1)
+#options(warn = 1)
+plot_pts_wr("Los Angeles Lakers")
+
+# library(ggplot2)
+# ggplot(data_need_2, aes(Season, PTS)) + 
+#   geom_point()
+# 
+# data_need_2$Season <- as.character(data_need_2$Season)
+# data_need_2$Season <- factor(data_need_2$Season)
+# plot(data_need_2$Season,data_need_2$PTS, type='l')
+# ?plot
+# length(data_need_2$Season)
+# num <- as.character(1:35)
+# plot(num,data_need_2$PTS, type='l')
+# plot(num,data_need_2$PTS,pch=15,
+#      col="DarkTurquoise",xlim = c(0,35),ylim=c(70,130),xaxt="n")
+# lines(data_need_2$PTS,col="DarkTurquoise",lty=1)#lty=1表示用实线连起来
+# axis(1,league_data$Season,at=1:35,las=3)    #设置X轴坐标刻度
+
+
+
+
+
+#问题4
+  syear <- unique(df$Season)
+  league_data <- data.frame( Season=rep(NA,35),
+                             PTS=rep(NA,35),
+                             X2.S=rep(NA,35), 
+                             X3.S=rep(NA,35),
+                             FT.S=rep(NA,35))
+  
+  for (i in 1:length(syear)){
+    #求联盟场均得分、两分球出手数、三分球出手数的均值
+     Season <- syear[i]
+     #按赛季选取数据
+     data_need_3 <- df[df$Season==Season,]
+     league_data[i,'Season'] <- Season
+     league_data[i,'PTS'] <- mean(data_need_3$PTS)
+     league_data[i,'X2.S'] <- mean(data_need_3$X2.S)
+     league_data[i,'X3.S'] <- mean(data_need_3$X3.S)
+     league_data[i,'FT.S'] <- mean(data_need_3$FT.S)
+     
+  }
+  par(mfrow=c(1,3))
+  #画出联盟场均得分随时间变化散点图
+  plot(league_data$Season,league_data$PTS,pch=15,col="DarkTurquoise",
+       xlim=c(0,35),ylim=c(80,120),
+       xlab = "season",ylab="联盟场均得分",xaxt="n")
+  lines(league_data$PTS,col="DarkTurquoise",lty=1)#lty=1表示用实线连起来
+  axis(1,league_data$Season,at=1:35,las=3)    #设置X轴坐标刻度
+  
+  
+  #画出罚球出手数随时间变化散点图
+  plot(league_data$Season,league_data$FT.S,pch=18,col="purple",
+       xlim=c(0,35),ylim=c(20,32),
+       xlab = "season",ylab="联盟场均罚球",xaxt="n")
+  lines(league_data$FT.S,col="purple",lty=1)#lty=1表示用实线连起来
+  axis(1,league_data$Season,at=1:35,las=3)    #设置X轴坐标刻度
+  
+  
+  #画出联盟两分球出手数随时间变化散点图
+  plot(league_data$Season,league_data$X2.S,pch=16,col="DeepPink",
+       xlim=c(0,35),ylim=c(0,100),
+       xlab = "season",ylab= "两分球/三分球出手数",xaxt="n")
+  lines(league_data$X2.S,col="DeepPink",lty=2) #lty=2表示用虚线连起来
+  axis(1,league_data$Season,at=1:35,las=3)    #设置X轴坐标刻度
+  
+  #画出联盟三分球出手数随时间变化散点图
+  points(league_data$Season,league_data$X3.S,pch=17,col="RosyBrown",cex=1)
+  lines(league_data$X3.S,col="RosyBrown",lty=3) #lty=3表示用点线连起来
+  #图例说明
+ legend(15,100,c("X2.S","X3.S"),col=c("DeepPink","RosyBrown"),text.col=c("DeepPink","RosyBrown"),pch=c(16,17),lty=c(2,3),xpd = TRUE)
+  
+
+  
+```
+
+## GitHub Documents
+
+This is an R Markdown format used for publishing markdown documents to GitHub. When you click the **Knit** button all R code chunks are run and a markdown file (.md) suitable for publishing to GitHub is generated.
+
+## Including Code
+
+You can include R code in the document as follows:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
